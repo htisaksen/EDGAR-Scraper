@@ -46,20 +46,16 @@ class Scraper():
 
     '''checks format of link and passes it through respective parser for transformation. Will add try and catch to provide validation on check'''
     def compile_filings(self):
-        print(self.links)
         for link in self.links:
-            print(type(link))
             if self.check_if_xml(link):
-                print('xml')
                 self.parse_deliminate_xml(link)
             else:
-                print('html')
                 self.parse_deliminate_html(link)
     '''Checks to see format of the url. Returns a boolean(SEC-DOCUMENT will signify XML formats) True: XML False: Text'''
     def check_if_xml(self,url):
         response = requests.get(url)
         response_text = response.text
-        #String is a unique tag in non xml format
+        #String is a unique tag in non xml format files
         if '<DESCRIPTION>13F-HR' in response_text:
             return False
         else:
@@ -68,14 +64,13 @@ class Scraper():
     '''parses and creates a CSV file with tab delimited values from html text'''
     def parse_deliminate_html(self,url):
 
-        print(url)
-
         html_text = requests.get(url)
         html_text = html_text.text
 
         '''find the starting point of <S> to </Table> for all necessary information'''
         table_start = list(re.finditer(r'<S>',html_text))
 
+        '''some of the non-xml text have varying table casing. This check makes sure one or the other is used to avoid errors'''
         if len(list(re.finditer(r'</TABLE>',html_text))) == 0:
             table_end = list(re.finditer(r'</Table>',html_text))
         else:
