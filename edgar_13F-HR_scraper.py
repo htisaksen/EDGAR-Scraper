@@ -2,6 +2,7 @@ import requests
 import re
 import xml.etree.ElementTree as ET
 import csv
+import os
 from lxml.html.soupparser import fromstring
 from bs4 import BeautifulSoup
 
@@ -19,15 +20,23 @@ class Scraper():
         '''function calls to automate scrape process'''
         self.compile_filings()
 
-    '''retrieves xml with url var. Formatted for 13-HR form'''
-    def get_xml(self,url):
+    '''retrieves xml with url var. Formatted for 13-HR form. Pass in xml or html as a string for second parameter'''
+    def get_url(self,url,format_type):
+
         response = requests.get(url)
-        soup_text = BeautifulSoup(response.text,'xml')
-        return soup_text
+
+        if format_type == 'xml':
+            soup_text = BeautifulSoup(response.text,'xml')
+            return soup_text
+        if format_type == 'html':
+            soup_text = BeautifulSoup(response.text,'html.parser')
+            return soup_text
+    def get_html(self,url):
+        response = request.get(url)
 
     '''Parses through self.url for links to all of the filings for the given organization'''
     def find_links(self):
-        meta = self.get_xml(self.url)
+        meta = self.get_url(self.url,'xml')
         links = []
         for link in meta.find_all('filing-href'):
             link = link.get_text()
@@ -35,24 +44,89 @@ class Scraper():
             links.append(link)
         return links
 
-    '''checks format of link and passes it through respective parser for transformation'''
+    '''checks format of link and passes it through respective parser for transformation. Will add try and catch to provide validation on check'''
     def compile_filings(self):
+        print(self.links)
         for link in self.links:
-            if self.check_if_xml:
+            print(type(link))
+            if self.check_if_xml(link):
+                print('xml')
                 self.parse_deliminate_xml(link)
-
-    '''Checks to see format of the url. Returns a boolean(SEC-DOCUMENT will signify XML formats)'''
+            else:
+                print('html')
+                self.parse_deliminate_html(link)
+    '''Checks to see format of the url. Returns a boolean(SEC-DOCUMENT will signify XML formats) True: XML False: Text'''
     def check_if_xml(self,url):
-        format_check = requests.get(url)
-        if format_check.text[1:13] == 'SEC-DOCUMENT':
-            return True
-        else:
+        response = requests.get(url)
+        response_text = response.text
+        #String is a unique tag in non xml format
+        if '<DESCRIPTION>13F-HR' in response_text:
             return False
+        else:
+            return True
+
+    '''parses and creates a CSV file with tab delimited values from html text'''
+    def parse_deliminate_html(self,url):
+
+        print(url)
+
+        html_text = requests.get(url)
+        html_text = html_text.text
+
+        '''find the starting point of <S> to </Table> for all necessary information'''
+        table_start = list(re.finditer(r'<S>',html_text))
+
+        if len(list(re.finditer(r'</TABLE>',html_text))) == 0:
+            table_end = list(re.finditer(r'</Table>',html_text))
+        else:
+            table_end = list(re.finditer(r'</TABLE>',html_text))
+
+        table_start_index = [i.start()+len("<S>\n") for i in table_start]
+        table_end_index = [i.start() for i in table_end]
+
+        table_info = html_text[table_start_index[0]:table_end_index[0]]
+
+        #use c_tag to indicate start of column
+        c_tag = list(re.finditer(r"<C>", table_info))
+        # create positions for the <C> tags
+        c_tag_position = [c.start() for c in c_tag]
+        #place 0 in c_tag_list for initial index
+        c_tag_position.insert(0,0)
+
+        '''hard coded headers for csv file'''
+        csv_headers = ['nameofissuer','titleofclass','cusip','value','shrsorprnamt','investmentdiscretion','othermanagers','votingauthority']
+
+        '''creates a dump file labeled the cik or ticker for CSV files naming is set to the name of the file'''
+        if not os.path.exists(self.ticker_or_cik):
+            os.makedirs(self.ticker_or_cik)
+        filing_id = url[-20:-4]
+        filings_data = open('./{ticker_or_cik}/{filing_id}-13F-HR-Filing.csv'.format(ticker_or_cik = self.ticker_or_cik,filing_id = filing_id), 'w')
+        csvwriter = csv.writer(filings_data,delimiter = '\t')
+        csvwriter.writerow(csv_headers)
+
+        '''creating a list to write rows in csv'''
+        for fundline in table_info.split('\n')[1:-1]:
+            temp_list = []
+            shrsorprnamt = []
+            temp_list.append(fundline[c_tag_position[0]:c_tag_position[1]+4])           #nameofissuer
+            temp_list.append(fundline[c_tag_position[1]+4:c_tag_position[2]+4])         #titleofclass
+            temp_list.append(fundline[c_tag_position[2]:c_tag_position[3]+3])           #cusip
+            temp_list.append(fundline[c_tag_position[3]+3:c_tag_position[4]+3])         #value
+            shrsorprnamt.append(fundline[c_tag_position[4]+4:c_tag_position[5]+4])      #shrsorprnamt
+            shrsorprnamt.append(fundline[c_tag_position[5]+1:c_tag_position[6]])        #sh/prn
+            temp_list.append(shrsorprnamt)
+            temp_list.append(fundline[c_tag_position[6]:c_tag_position[7]])             #investmentdiscretion
+            temp_list.append(fundline[c_tag_position[7]:c_tag_position[8]])             #othermanagers
+            temp_list.append(fundline[c_tag_position[8]:c_tag_position[9]])             #votingauthority
+            temp_list.append(fundline[c_tag_position[9]:c_tag_position[10]+3])
+            csvwriter.writerow(temp_list)
+
+        filings_data.close()
 
     '''creates csv from xml'''
     def parse_deliminate_xml(self,url):
 
-        xml_string = str(self.get_xml(url))
+        xml_string = str(self.get_url(url,'xml'))
 
         '''using regex to group segments of the txt/string'''
         xml_string_start = re.finditer(r"<XML>", xml_string)
@@ -69,8 +143,12 @@ class Scraper():
 
         root = fromstring(information_table)
         '''writing csv to filingsdata.csv'''
+
+        if not os.path.exists(self.ticker_or_cik):
+            os.makedirs(self.ticker_or_cik)
+
         filing_id = url[-20:-4]
-        filings_data = open('./{filing_id}-13F-HR-Filing.csv'.format(filing_id = filing_id), 'w')
+        filings_data = open('./{ticker_or_cik}/{filing_id}-13F-HR-Filing.csv'.format(ticker_or_cik = self.ticker_or_cik,filing_id = filing_id), 'w')
         csvwriter = csv.writer(filings_data, delimiter = '\t')
 
         filings_head = []
