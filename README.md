@@ -1,27 +1,13 @@
 # EDGAR-Scraper
 
 # Overview:
-- This tool is made to scrape 13F-HR filings on the U.S. Security and Exchange Commission
-
-# Objective:
 
 - Scraper that parses fund holdings pulled from EDGAR, given a ticker or CIK.
-
-# Example:
-
-- For this example, we will use this CIK: 0001166559
-- Start on this page: http://www.sec.gov/edgar/searchedgar/companysearch.html
-- Enter in the CIK (or ticker), and it will take you here.
-- Find the “13F” report documents from the ones listed. Here is a “13F-HR”.
-- Parse and generate tab-delimited text from the xml
-
-#Goals:
-
-- Your code should be able to use any mutual fund ticker. Try morningstar.com or lipperweb.com to find valid tickers.
-- Be sure to check multiple tickers, since the format of the 13F reports can differ.
-- Let us know your thoughts on how to deal with different formats.  
+- Provides tab delimited CSV files for each 13F-HR filing in the SEC database
 
 #Resources:
+http://www.sec.gov/edgar/searchedgar/companysearch.html - Scraping from the SEC website
+
 https://datahub.io/dataset/edgar - Information about the sec.gov API
 
 #Notes:
