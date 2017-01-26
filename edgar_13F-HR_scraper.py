@@ -52,19 +52,16 @@ class Scraper():
     '''creates csv from xml'''
     def parse_deliminate_xml(self,url):
 
-        xml_string = str(self.get_xml(url)) # needs to change to accomodate the list of links
-        #print(xml_string)
+        xml_string = str(self.get_xml(url))
+
         '''using regex to group segments of the txt/string'''
         xml_string_start = re.finditer(r"<XML>", xml_string)
         xml_string_close = re.finditer(r"</XML>", xml_string)
 
-        #print(xml_string_start,xml_string_close)
 
         start_index = [i.start()+len("<XML>\n") for i in xml_string_start]
         close_index = [i.start() for i in xml_string_close]
 
-        #print(start_index)
-        #print(close_index)
 
         '''Meta info provides information about the filing and information table segments the tags to transform into CSV format'''
         #meta_info = xml_string[start_index[0]:close_index[0]]
